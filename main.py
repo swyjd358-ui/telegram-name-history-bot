@@ -31,16 +31,20 @@ def save_user_name(user_id, current_name):
 # رصد تلقائي لأسماء الأعضاء في المجموعات والخاص لتخزينها
 @app.on_message(filters.group | filters.private, group=-1)
 async def auto_track(client, message: Message):
-    if message.from_user:
-        first = message.from_user.first_name or ""
-        last = message.from_user.last_name or ""
-        full_name = f"{first} {last}".strip()
-        if full_name:
-            save_user_name(message.from_user.id, full_name)
+    # حماية: إذا كانت الرسالة من بوت أو من البوت نفسه، يتم تجاهلها فوراً لمنع التكرار
+    if not message.from_user or message.from_user.is_bot:
+        return
+        
+    first = message.from_user.first_name or ""
+    last = message.from_user.last_name or ""
+    full_name = f"{first} {last}".strip()
+    if full_name:
+        save_user_name(message.from_user.id, full_name)
 
 # تفعيل أزرار المنيو الشبيهة بالبوت الروسي عند إرسال /start أو /menu
 @app.on_message(filters.command(["start", "menu"]))
 async def send_welcome_menu(client, message: Message):
+    if message.from_user and message.from_user.is_bot: return
     await message.reply(
         "👋 أهلاً بك في بوت استعراض الأسماء المجاني 100% بدون كرستالات!\n\n"
         " اضغط على الأزرار أدناه للاستخدام:",
@@ -56,6 +60,7 @@ async def send_welcome_menu(client, message: Message):
 # استقبال أمر فحص الأسماء أو الضغط على زر الفحص
 @app.on_message(filters.command("history") | filters.regex("🔍 فحص الأسماء بالرد"))
 async def check_history(client, message: Message):
+    if message.from_user and message.from_user.is_bot: return
     if message.reply_to_message and message.reply_to_message.from_user:
         target = message.reply_to_message.from_user
     else:
@@ -70,20 +75,22 @@ async def check_history(client, message: Message):
         
     reply_text = f"👤 **تاريخ أسماء المستخدم ({target.id}):**\n\n"
     for i, row in enumerate(records, 1):
-        reply_text += f"{i}. `{row}`\n"
+        reply_text += f"{i}. `{row[0]}`\n"
         
     await message.reply(reply_text)
 
 # زر المساعدة
 @app.on_message(filters.regex("ℹ️ مساعدة") | filters.command("help"))
 async def help_command(client, message: Message):
+    if message.from_user and message.from_user.is_bot: return
     await message.reply("💡 **طريقة عمل البوت:**\n\nقم بإضافة البوت كمشرف في مجموعتك، وسيبدأ تلقائياً برصد وحفظ أسماء الأعضاء كلما تفاعلوا أو قاموا بتغيير أسمائهم. لرؤية أسماء أي شخص، فقط قم بالرد على رسالته واضغط زر (🔍 فحص الأسماء بالرد) أو أرسل أمر /history.")
 
 # زر الإحصائيات
 @app.on_message(filters.regex("📊 إحصائيات البوت"))
 async def stats_command(client, message: Message):
+    if message.from_user and message.from_user.is_bot: return
     cursor.execute("SELECT COUNT(DISTINCT user_id) FROM history")
     total_users = cursor.fetchone()
-    await message.reply(f"📊 **إحصائيات البوت الحالية:**\n\n👤 عدد المستخدمين المسجلين في القاعدة: {total_users}")
+    await message.reply(f"📊 **إحصائيات البوت الحالية:**\n\n👤 عدد المستخدمين المسجلين في القاعدة: {total_users[0]}")
 
 app.run()
